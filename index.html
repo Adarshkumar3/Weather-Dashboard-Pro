@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather Dashboard Pro</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2ecc71;
+            --background-color: #ecf0f1;
+            --text-color: #34495e;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            flex-grow: 1;
+        }
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 20px 0;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        h1 {
+            margin: 0;
+            font-size: 2.5em;
+        }
+        #search-container {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        #city-input {
+            padding: 10px;
+            font-size: 1em;
+            border: none;
+            border-radius: 5px 0 0 5px;
+            width: 300px;
+        }
+        #search-btn {
+            padding: 10px 20px;
+            font-size: 1em;
+            background-color: var(--secondary-color);
+            color: white;
+            border: none;
+            border-radius: 0 5px 5px 0;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        #search-btn:hover {
+            background-color: #27ae60;
+        }
+        #favorites {
+            background-color: white;
+            border-radius: 5px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        #favorite-list {
+            list-style-type: none;
+            padding: 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .favorite-city {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            text-decoration: none;
+            transition: background-color 0.3s;
+        }
+        .favorite-city:hover {
+            background-color: #2980b9;
+        }
+        #weather-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        #current-weather, #forecast {
+            background-color: white;
+            border-radius: 5px;
+            padding: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            flex: 1;
+            min-width: 300px;
+        }
+        .weather-icon {
+            width: 100px;
+            height: 100px;
+        }
+        .forecast-item {
+            background-color: var(--background-color);
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+        }
+        .forecast-icon {
+            width: 50px;
+            height: 50px;
+            margin-right: 10px;
+        }
+        #loader {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: var(--primary-color);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        footer {
+            background-color: var(--primary-color);
+            color: white;
+            text-align: center;
+            padding: 10px 0;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Weather Dashboard Pro</h1>
+    </header>
+
+    <div class="container">
+        <div id="search-container">
+            <input type="text" id="city-input" placeholder="Enter city name">
+            <button id="search-btn">Search</button>
+        </div>
+        
+        <div id="favorites">
+            <h2>Favorite Cities</h2>
+            <ul id="favorite-list"></ul>
+        </div>
+        
+        <div id="loader">
+            <div class="spinner"></div>
+        </div>
+
+        <div id="weather-container">
+            <div id="current-weather"></div>
+            <div id="forecast">
+                <h2>3-Day Forecast</h2>
+                <div id="forecast-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>© 2024 Weather Dashboard Pro. Powered by WeatherAPI.com</p>
+    </footer>
+
+    <script>
+        const API_KEY = 'ef4a6c091bmshcee980db48a7208p14291ejsn372245319a33';
+        const API_HOST = 'weatherapi-com.p.rapidapi.com';
+
+        $(document).ready(function() {
+            loadFavorites();
+            $('#search-btn').click(searchWeather);
+            $('#city-input').keypress(function(e) {
+                if (e.which === 13) searchWeather();
+            });
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(position => {
+                    getWeatherData(`${position.coords.latitude},${position.coords.longitude}`);
+                }, error => {
+                    console.error("Error getting location:", error);
+                    getWeatherData('London'); // Default city if geolocation fails
+                });
+            } else {
+                getWeatherData('London'); // Default city if geolocation is not supported
+            }
+        });
+
+        async function searchWeather() {
+            const city = $('#city-input').val().trim();
+            if (city) {
+                await getWeatherData(city);
+            }
+        }
+
+        async function getWeatherData(location) {
+            $('#loader').show();
+            $('#weather-container').hide();
+
+            try {
+                const url = `https://${API_HOST}/forecast.json?q=${encodeURIComponent(location)}&days=3`;
+                const options = {
+                    method: 'GET',
+                    headers: {
+                        'x-rapidapi-key': API_KEY,
+                        'x-rapidapi-host': API_HOST
+                    }
+                };
+
+                const response = await fetch(url, options);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                displayCurrentWeather(data);
+                displayForecast(data.forecast.forecastday);
+                addToFavorites(data.location.name);
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error fetching weather data. Please try again.');
+            } finally {
+                $('#loader').hide();
+                $('#weather-container').show();
+            }
+        }
+
+        function displayCurrentWeather(data) {
+            const html = `
+                <h2>Current Weather in ${data.location.name}, ${data.location.country}</h2>
+                <img class="weather-icon" src="${data.current.condition.icon}" alt="${data.current.condition.text}">
+                <p>${data.current.condition.text}</p>
+                <p><i class="fas fa-thermometer-half"></i> Temperature: ${data.current.temp_c}°C<img src="https://www.pngplay.com/wp-content/uploads/8/Climate-Temperature-PNG-Clipart-Background.png" alt="Girl in a jacket" width="100" height="200">
+</p>
+                <p><i class="fas fa-tint"></i> Humidity: ${data.current.humidity}% <img src="https://m.media-amazon.com/images/S/aplus-media/vc/09fe2011-2069-4b84-a50b-89d62e54b5a5.__CR0,0,300,300_PT0_SX300_V1___.png" width="100" height="200"></p>
+                <p><i class="fas fa-wind"></i> Wind Speed: ${data.current.wind_kph} km/h<img src=" https://media.istockphoto.com/vectors/vector-illustration-of-wind-icon-isolated-on-white-vector-id904975752?k=20&m=904975752&s=612x612&w=0&h=M5bb3y78rTI-fXuXy433hfc3iV6APAJXuhG3312gWcQ=" alt="Girl in a jacket" width="100" height="200">
+</p>
+                <p><i class="fas fa-compass"></i> Wind Direction: ${data.current.wind_dir}<img src="https://th.bing.com/th/id/OIP.F_TUUuud2zV1AC7jNq4lPwHaHa?rs=1&pid=ImgDetMain" alt="Girl in a jacket" width="100" height="200"></p>
+                <p><i class="fas fa-sun"></i> UV Index: ${data.current.uv} <img src="https://th.bing.com/th/id/OIP.6702q5jH9qS5CdBW_kGkIwHaG4?rs=1&pid=ImgDetMain" alt="Girl in a jacket" width="100" height="200">
+</p>
+                <p><i class="fas fa-eye"></i> Visibility: ${data.current.vis_km} km<img src="https://cdn-icons-png.flaticon.com/512/5263/5263154.png" alt="Girl in a jacket" width="100" height="200"></p>
+            `;
+            $('#current-weather').html(html);
+        }
+
+        function displayForecast(forecastData) {
+            let html = '';
+            forecastData.forEach(day => {
+                html += `
+                    <div class="forecast-item">
+                        <img class="forecast-icon" src="${day.day.condition.icon}" alt="${day.day.condition.text}">
+                        <div>
+                            <p>${moment(day.date).format('dddd, MMM D')}</p>
+                            <p>${day.day.condition.text}</p>
+                            <p>High: ${day.day.maxtemp_c}°C, Low: ${day.day.mintemp_c}°C</p>
+                        </div>
+                    </div>
+                `;
+            });
+            $('#forecast-container').html(html);
+        }
+
+        function addToFavorites(city) {
+            let favorites = JSON.parse(localStorage.getItem('favorites')) || [];
+            if (!favorites.includes(city)) {
+                favorites.push(city);
+                localStorage.setItem('favorites', JSON.stringify(favorites));
+                loadFavorites();
+            }
+        }
+
+        function loadFavorites() {
+            const favorites = JSON.parse(localStorage.getItem('favorites')) || [];
+            let html = '';
+            for (const city of favorites) {
+                html += `<li><a href="#" class="favorite-city">${city}</a></li>`;
+            }
+            $('#favorite-list').html(html);
+            $('.favorite-city').click(function(e) {
+                e.preventDefault();
+                getWeatherData($(this).text());
+            });
+        }
+    </script>
+</body>
+</html>
